@@ -147,6 +147,14 @@ func (tm *TaskMatcher) Offer(ctx context.Context, task *internalTask) (bool, err
 		// no poller waiting for tasks, try forwarding this task to the
 		// root partition if possible
 		select {
+		case tm.taskC <- task: // poller picked up the task
+			if task.responseC != nil {
+				// if there is a response channel, block until resp is received
+				// and return error if the response contains error
+				err := <-task.responseC
+				return true, err
+			}
+			return false, nil
 		case token := <-tm.fwdrAddReqTokenC():
 			if err := tm.fwdr.ForwardTask(ctx, task); err == nil {
 				// task was remotely sync matched on the parent partition
