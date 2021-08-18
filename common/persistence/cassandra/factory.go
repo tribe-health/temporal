@@ -123,6 +123,9 @@ func (f *Factory) Close() {
 	if f.execStoreFactory != nil {
 		f.execStoreFactory.close()
 	}
+	if f.session != nil {
+		f.session.Close()
+	}
 }
 
 func (f *Factory) executionStoreFactory() (*executionStoreFactory, error) {

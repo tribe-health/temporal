@@ -480,6 +480,7 @@ func copyCustomSearchAttributesFromDynamicConfigToClusterMetadata(
 		nil,
 		logger,
 	)
+	defer factory.Close()
 
 	clusterMetadataManager, err := factory.NewClusterMetadataManager()
 	if err != nil {
@@ -530,6 +531,7 @@ func updateClusterMetadataConfig(
 		nil,
 		logger,
 	)
+	defer factory.Close()
 
 	clusterMetadataManager, err := factory.NewClusterMetadataManager()
 	if err != nil {
@@ -594,6 +596,7 @@ func initSystemNamespaces(
 		nil,
 		logger,
 	)
+	defer factory.Close()
 
 	metadataManager, err := factory.NewMetadataManager()
 	if err != nil {
