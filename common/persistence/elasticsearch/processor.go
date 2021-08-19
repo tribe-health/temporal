@@ -196,6 +196,7 @@ func (p *processorImpl) Add(request *client.BulkableRequest, visibilityTaskKey s
 func (p *processorImpl) bulkBeforeAction(_ int64, requests []elastic.BulkableRequest) {
 	p.metricsClient.AddCounter(metrics.ElasticsearchBulkProcessor, metrics.ElasticsearchBulkProcessorRequests, int64(len(requests)))
 	p.metricsClient.RecordDistribution(metrics.ElasticsearchBulkProcessor, metrics.ElasticsearchBulkProcessorBulkSize, len(requests))
+	p.metricsClient.RecordDistribution(metrics.ElasticsearchBulkProcessor, metrics.ElasticsearchBulkProcessorQueuedRequests, p.mapToAckChan.Len()-len(requests))
 
 	for _, request := range requests {
 		visibilityTaskKey := p.extractVisibilityTaskKey(request)
@@ -407,10 +408,13 @@ func (a *ackChan) start(metricsClient metrics.Client) {
 }
 
 func (a *ackChan) done(ack bool, metricsClient metrics.Client) {
-	a.ackChInternal <- ack
-
-	metricsClient.RecordTimer(metrics.ElasticsearchBulkProcessor, metrics.ElasticsearchBulkProcessorRequestLatency, time.Now().UTC().Sub(a.addedAt))
-	if !a.startedAt.IsZero() {
-		metricsClient.RecordTimer(metrics.ElasticsearchBulkProcessor, metrics.ElasticsearchBulkProcessorCommitLatency, time.Now().UTC().Sub(a.startedAt))
+	select {
+	case a.ackChInternal <- ack:
+		metricsClient.RecordTimer(metrics.ElasticsearchBulkProcessor, metrics.ElasticsearchBulkProcessorRequestLatency, time.Now().UTC().Sub(a.addedAt))
+		if !a.startedAt.IsZero() {
+			metricsClient.RecordTimer(metrics.ElasticsearchBulkProcessor, metrics.ElasticsearchBulkProcessorCommitLatency, time.Now().UTC().Sub(a.startedAt))
+		}
+	default:
+		metricsClient.IncCounter(metrics.ElasticsearchBulkProcessor, metrics.ElasticsearchBulkProcessorDeadlock)
 	}
 }
